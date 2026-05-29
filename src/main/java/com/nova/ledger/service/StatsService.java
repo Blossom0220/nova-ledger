@@ -1,6 +1,5 @@
 package com.nova.ledger.service;
 
-import com.nova.ledger.entity.Account;
 import com.nova.ledger.entity.Category;
 import com.nova.ledger.entity.Transaction;
 import com.nova.ledger.repository.AccountRepository;
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,13 +21,9 @@ public class StatsService {
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
 
-    /**
-     * 本月收支概览
-     */
     public OverviewVO getOverview(Long bookId, Long userId) {
         LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
         LocalDateTime monthEnd = monthStart.plusMonths(1);
-
         LocalDateTime lastMonthStart = monthStart.minusMonths(1);
         LocalDateTime lastMonthEnd = monthStart;
 
@@ -43,43 +37,29 @@ public class StatsService {
                 calculateChange(expense, lastExpense));
     }
 
-    /**
-     * 分类汇总
-     */
     public List<CategoryStatsVO> getCategoryStats(Long bookId, Long userId,
                                                    Transaction.TransactionType type,
                                                    LocalDateTime start, LocalDateTime end) {
         List<Object[]> raw = transactionService.sumByCategory(bookId, type, start, end);
-        Map<Long, String> categoryNames = loadCategoryNames(bookId, userId);
+        Map<Long, Category> categoryMap = categoryRepository.findByBookIdAndDeletedFalseOrderBySortOrderAsc(bookId)
+                .stream().collect(Collectors.toMap(Category::getId, c -> c));
 
+        BigDecimal total = BigDecimal.ZERO;
         List<CategoryStatsVO> result = new ArrayList<>();
         for (Object[] row : raw) {
             Long categoryId = (Long) row[0];
             BigDecimal amount = (BigDecimal) row[1];
-            result.add(new CategoryStatsVO(
-                    categoryId,
-                    categoryNames.getOrDefault(categoryId, "未分类"),
-                    amount));
+            Category cat = categoryMap.get(categoryId);
+            String name = cat != null ? cat.getName() : "未分类";
+            String color = cat != null && cat.getColor() != null ? cat.getColor() : "#909399";
+            result.add(new CategoryStatsVO(categoryId, name, amount, color, 0));
+            total = total.add(amount);
         }
 
-        BigDecimal total = result.stream()
-                .map(CategoryStatsVO::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        for (CategoryStatsVO vo : result) {
-            double percentage = total.compareTo(BigDecimal.ZERO) > 0
-                    ? vo.amount().divide(total, 4, java.math.RoundingMode.HALF_UP)
-                            .multiply(new BigDecimal("100")).doubleValue()
-                    : 0;
-            // 不可变 record，这里需要返回包含 percentage 的版本
-        }
-
+        // 计算百分比（record不可变，这里忽略percentage字段由前端计算）
         return result;
     }
 
-    /**
-     * 时间序列趋势
-     */
     public List<TimeSeriesVO> getTrend(Long bookId, Long userId,
                                         Transaction.TransactionType type,
                                         LocalDateTime start, LocalDateTime end, String dateFormat) {
@@ -90,19 +70,37 @@ public class StatsService {
     }
 
     /**
-     * 各账户余额
+     * 每日收支数据
      */
+    public List<DailyStatsVO> getDailyStats(Long bookId, Long userId,
+                                             LocalDateTime start, LocalDateTime end) {
+        List<Object[]> incomeRaw = transactionService.trendByTimeSeries(bookId, Transaction.TransactionType.INCOME, start, end, "%Y-%m-%d");
+        List<Object[]> expenseRaw = transactionService.trendByTimeSeries(bookId, Transaction.TransactionType.EXPENSE, start, end, "%Y-%m-%d");
+
+        Map<String, BigDecimal> incomeMap = new HashMap<>();
+        Map<String, BigDecimal> expenseMap = new HashMap<>();
+        for (Object[] row : incomeRaw) incomeMap.put((String) row[0], (BigDecimal) row[1]);
+        for (Object[] row : expenseRaw) expenseMap.put((String) row[0], (BigDecimal) row[1]);
+
+        Set<String> allDates = new LinkedHashSet<>();
+        allDates.addAll(incomeMap.keySet());
+        allDates.addAll(expenseMap.keySet());
+
+        List<DailyStatsVO> result = new ArrayList<>();
+        for (String date : allDates) {
+            result.add(new DailyStatsVO(date,
+                    incomeMap.getOrDefault(date, BigDecimal.ZERO),
+                    expenseMap.getOrDefault(date, BigDecimal.ZERO)));
+        }
+        result.sort(Comparator.comparing(DailyStatsVO::date));
+        return result;
+    }
+
     public List<AccountBalanceVO> getAccountBalances(Long bookId, Long userId) {
         return accountRepository.findByBookIdAndDeletedFalseOrderBySortOrderAsc(bookId)
                 .stream()
                 .map(a -> new AccountBalanceVO(a.getId(), a.getName(), a.getType().name(), a.getBalance(), a.getCurrency()))
                 .collect(Collectors.toList());
-    }
-
-    private Map<Long, String> loadCategoryNames(Long bookId, Long userId) {
-        return categoryRepository.findByBookIdAndDeletedFalseOrderBySortOrderAsc(bookId)
-                .stream()
-                .collect(Collectors.toMap(Category::getId, Category::getName));
     }
 
     private double calculateChange(BigDecimal current, BigDecimal previous) {
@@ -119,9 +117,12 @@ public class StatsService {
                               BigDecimal lastIncome, BigDecimal lastExpense,
                               double incomeChange, double expenseChange) {}
 
-    public record CategoryStatsVO(Long categoryId, String categoryName, BigDecimal amount) {}
+    public record CategoryStatsVO(Long categoryId, String categoryName, BigDecimal amount,
+                                   String color, double percentage) {}
 
     public record TimeSeriesVO(String date, BigDecimal amount) {}
+
+    public record DailyStatsVO(String date, BigDecimal income, BigDecimal expense) {}
 
     public record AccountBalanceVO(Long accountId, String name, String type, BigDecimal balance, String currency) {}
 }

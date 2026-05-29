@@ -51,6 +51,17 @@ public class StatsController {
                 statsService.getTrend(bookId, userId, type, start, end, dateFormat)));
     }
 
+    @GetMapping("/daily")
+    public ResponseEntity<ApiResponse<List<StatsService.DailyStatsVO>>> daily(
+            @PathVariable Long bookId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success(
+                statsService.getDailyStats(bookId, userId, startDate, endDate)));
+    }
+
     @GetMapping("/accounts")
     public ResponseEntity<ApiResponse<List<StatsService.AccountBalanceVO>>> accountBalances(
             @PathVariable Long bookId, Authentication auth) {

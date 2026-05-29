@@ -1,6 +1,7 @@
 package com.nova.ledger.controller;
 
 import com.nova.ledger.dto.ApiResponse;
+import com.nova.ledger.dto.TransactionVO;
 import com.nova.ledger.entity.Transaction;
 import com.nova.ledger.service.TransactionService;
 import jakarta.validation.Valid;
@@ -23,7 +24,7 @@ public class TransactionController {
     private final TransactionService transactionService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<Transaction>>> searchTransactions(
+    public ResponseEntity<ApiResponse<Page<TransactionVO>>> searchTransactions(
             @PathVariable Long bookId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
@@ -35,42 +36,44 @@ public class TransactionController {
             @RequestParam(defaultValue = "20") int size,
             Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        Page<Transaction> result = transactionService.searchTransactions(
+        Page<TransactionVO> result = transactionService.searchTransactions(
                 bookId, userId, startDate, endDate, categoryId, accountId, type, keyword,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionTime")));
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Transaction>> getTransaction(
+    public ResponseEntity<ApiResponse<TransactionVO>> getTransaction(
             @PathVariable Long bookId,
             @PathVariable Long id,
             Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        return ResponseEntity.ok(ApiResponse.success(transactionService.getTransaction(id, userId)));
+        return ResponseEntity.ok(ApiResponse.success(transactionService.getTransactionVO(id, userId)));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Transaction>> createTransaction(
+    public ResponseEntity<ApiResponse<TransactionVO>> createTransaction(
             @PathVariable Long bookId,
             @Valid @RequestBody Transaction transaction,
             Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         transaction.setUserId(userId);
         transaction.setBookId(bookId);
+        Transaction saved = transactionService.createTransaction(transaction);
         return ResponseEntity.ok(ApiResponse.success("记账成功",
-                transactionService.createTransaction(transaction)));
+                transactionService.getTransactionVO(saved.getId(), userId)));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<Transaction>> updateTransaction(
+    public ResponseEntity<ApiResponse<TransactionVO>> updateTransaction(
             @PathVariable Long bookId,
             @PathVariable Long id,
             @Valid @RequestBody Transaction transaction,
             Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
+        transactionService.updateTransaction(id, userId, transaction);
         return ResponseEntity.ok(ApiResponse.success("更新成功",
-                transactionService.updateTransaction(id, userId, transaction)));
+                transactionService.getTransactionVO(id, userId)));
     }
 
     @DeleteMapping("/{id}")
