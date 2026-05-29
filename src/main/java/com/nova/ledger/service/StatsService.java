@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -44,19 +45,22 @@ public class StatsService {
         Map<Long, Category> categoryMap = categoryRepository.findByBookIdAndDeletedFalseOrderBySortOrderAsc(bookId)
                 .stream().collect(Collectors.toMap(Category::getId, c -> c));
 
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal total = raw.stream()
+                .map(row -> (BigDecimal) row[1])
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         List<CategoryStatsVO> result = new ArrayList<>();
         for (Object[] row : raw) {
             Long categoryId = (Long) row[0];
             BigDecimal amount = (BigDecimal) row[1];
             Category cat = categoryMap.get(categoryId);
-            String name = cat != null ? cat.getName() : "未分类";
+            String name = cat != null ? cat.getName() : "\u672a\u5206\u7c7b";
             String color = cat != null && cat.getColor() != null ? cat.getColor() : "#909399";
-            result.add(new CategoryStatsVO(categoryId, name, amount, color, 0));
-            total = total.add(amount);
+            double pct = total.compareTo(BigDecimal.ZERO) > 0
+                    ? amount.multiply(new BigDecimal("100")).divide(total, 1, RoundingMode.HALF_UP).doubleValue()
+                    : 0;
+            result.add(new CategoryStatsVO(categoryId, name, amount, color, pct));
         }
-
-        // 计算百分比（record不可变，这里忽略percentage字段由前端计算）
         return result;
     }
 
@@ -69,9 +73,6 @@ public class StatsService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 每日收支数据
-     */
     public List<DailyStatsVO> getDailyStats(Long bookId, Long userId,
                                              LocalDateTime start, LocalDateTime end) {
         List<Object[]> incomeRaw = transactionService.trendByTimeSeries(bookId, Transaction.TransactionType.INCOME, start, end, "%Y-%m-%d");
