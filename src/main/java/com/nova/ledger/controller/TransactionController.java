@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 
 @RestController
-@RequestMapping("/api/ledger/books/{bookId}/transactions")
+@RequestMapping("/ledger/books/{bookId}/transactions")
 @RequiredArgsConstructor
 public class TransactionController {
 

@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/ledger/books/{bookId}/budgets")
+@RequestMapping("/ledger/books/{bookId}/budgets")
 @RequiredArgsConstructor
 public class BudgetController {
 

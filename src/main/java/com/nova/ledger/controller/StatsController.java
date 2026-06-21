@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/ledger/books/{bookId}/stats")
+@RequestMapping("/ledger/books/{bookId}/stats")
 @RequiredArgsConstructor
 public class StatsController {
 

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/ledger/books/{bookId}/accounts")
+@RequestMapping("/ledger/books/{bookId}/accounts")
 @RequiredArgsConstructor
 public class AccountController {
 
