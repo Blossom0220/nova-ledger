@@ -92,7 +92,7 @@ public class UserService {
 
     public Map<String, Object> login(LoginRequest request, HttpServletRequest httpRequest) {
         User user = userRepository.findByUsername(request.getUsername().trim())
-                .orElseThrow(() -> new RuntimeException("用户名或密码错误"));
+                .orElseThrow(() -> new RuntimeException("账号不存在"));
 
         if (!user.getEnabled()) {
             logLogin(user.getId(), httpRequest, false, "账号已被禁用");
@@ -101,7 +101,7 @@ public class UserService {
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             logLogin(user.getId(), httpRequest, false, "密码错误");
-            throw new RuntimeException("用户名或密码错误");
+            throw new RuntimeException("密码错误，请重新输入");
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getUsername());

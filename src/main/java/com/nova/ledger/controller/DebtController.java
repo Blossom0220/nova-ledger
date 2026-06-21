@@ -42,6 +42,14 @@ public class DebtController {
                 debtService.updateDebt(id, userId, debt)));
     }
 
+    @PostMapping("/{id}/settle")
+    public ResponseEntity<ApiResponse<Debt>> settleDebt(
+            @PathVariable Long bookId, @PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success("结清成功",
+                debtService.settleDebt(id, userId)));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteDebt(
             @PathVariable Long bookId, @PathVariable Long id, Authentication auth) {

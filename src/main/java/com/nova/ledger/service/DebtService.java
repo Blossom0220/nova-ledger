@@ -57,4 +57,12 @@ public class DebtService {
         }
         return debt;
     }
+
+    @Transactional
+    public Debt settleDebt(Long id, Long userId) {
+        Debt debt = getDebt(id, userId);
+        debt.setRepaidAmount(debt.getAmount());
+        debt.setStatus(Debt.DebtStatus.SETTLED);
+        return debtRepository.save(debt);
+    }
 }
